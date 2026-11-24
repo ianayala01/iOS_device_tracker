@@ -12,7 +12,7 @@ import SwiftData
 struct iOS_Device_TrackerApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            TrackedDevice.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -25,7 +25,7 @@ struct iOS_Device_TrackerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            NearbyDevicesView()
         }
         .modelContainer(sharedModelContainer)
     }
