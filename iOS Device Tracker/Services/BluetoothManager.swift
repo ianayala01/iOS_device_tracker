@@ -8,7 +8,9 @@
 import CoreBluetooth
 import Combine
 import Foundation
+import SwiftData
 
+/// Owns the Core Bluetooth scanner and publishes the devices found by it.
 @MainActor
 final class BluetoothManager: NSObject, ObservableObject {
     @Published private(set) var nearbyDevices: [TrackedDevice] = []
@@ -17,6 +19,7 @@ final class BluetoothManager: NSObject, ObservableObject {
 
     private var centralManager: CBCentralManager!
     private var devicesByID: [UUID: TrackedDevice] = [:]
+    private var modelContext: ModelContext?
 
     override init() {
         super.init()
@@ -25,6 +28,10 @@ final class BluetoothManager: NSObject, ObservableObject {
             delegate: self,
             queue: nil
         )
+    }
+
+    func configure(with modelContext: ModelContext) {
+        self.modelContext = modelContext
     }
 
     func startScanning() {
@@ -44,11 +51,12 @@ final class BluetoothManager: NSObject, ObservableObject {
     func stopScanning() {
         centralManager.stopScan()
         isScanning = false
+        saveChanges()
     }
 
     func toggleTrusted(for device: TrackedDevice) {
         device.isTrusted.toggle()
-        nearbyDevices.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        saveChanges()
     }
 
     private func updateDevice(
@@ -61,10 +69,14 @@ final class BluetoothManager: NSObject, ObservableObject {
         let deviceName = advertisedName ?? peripheral.name ?? "Unknown Device"
         let signalStrength = rssi.intValue
 
-        if let existingDevice = devicesByID[deviceID] {
-            existingDevice.name = deviceName
-            existingDevice.lastSeen = .now
-            existingDevice.latestRSSI = signalStrength
+        let device: TrackedDevice
+        var isNewDevice = false
+
+        if let liveDevice = devicesByID[deviceID] {
+            device = liveDevice
+        } else if let savedDevice = savedDevice(withID: deviceID) {
+            device = savedDevice
+            devicesByID[deviceID] = savedDevice
         } else {
             let newDevice = TrackedDevice(
                 id: deviceID,
@@ -72,11 +84,45 @@ final class BluetoothManager: NSObject, ObservableObject {
                 latestRSSI: signalStrength
             )
 
+            modelContext?.insert(newDevice)
             devicesByID[deviceID] = newDevice
+            device = newDevice
+            isNewDevice = true
         }
+
+        // Update the live information without changing the saved trust choice.
+        device.name = deviceName
+        device.lastSeen = .now
+        device.latestRSSI = signalStrength
 
         nearbyDevices = devicesByID.values.sorted {
             $0.latestRSSI > $1.latestRSSI
+        }
+
+        // Save newly discovered devices immediately. RSSI and last-seen changes
+        // are saved when scanning stops to avoid writing for every advertisement.
+        if isNewDevice {
+            saveChanges()
+        }
+    }
+
+    private func savedDevice(withID id: UUID) -> TrackedDevice? {
+        guard let modelContext else { return nil }
+
+        let descriptor = FetchDescriptor<TrackedDevice>(
+            predicate: #Predicate { device in
+                device.id == id
+            }
+        )
+
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func saveChanges() {
+        do {
+            try modelContext?.save()
+        } catch {
+            print("Could not save tracked devices: \(error)")
         }
     }
 }
