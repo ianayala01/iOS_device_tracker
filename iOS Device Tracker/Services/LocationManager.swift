@@ -12,43 +12,60 @@ import Foundation
 @MainActor
 final class LocationManager: NSObject, ObservableObject {
     @Published private(set) var currentLocation: CLLocation?
-    @Published private(set) var authorizatioStatus: CLAuthorizationStatus
-    
+    @Published private(set) var authorizationStatus: CLAuthorizationStatus
+
     private let manager = CLLocationManager()
-    
-    override init(){
-        authorizatioStatus = manager.authorizationStatus
+
+    override init() {
+        authorizationStatus = manager.authorizationStatus
+
         super.init()
-        
+
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
-    
+
     func requestPermission() {
-        manager.requestWhenInUseAuthorization()
+        authorizationStatus = manager.authorizationStatus
+
+        switch authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+
+        case .authorizedWhenInUse, .authorizedAlways:
+            startUpdatingLocationIfAllowed()
+
+        default:
+            break
+        }
     }
-    
-    private func startUpdatingIfAllowed() {
-        guard authorizatioStatus == .authorizedWhenInUse ||
-                authorizatioStatus == .authorizedAlways else {
+
+    private func startUpdatingLocationIfAllowed() {
+        guard authorizationStatus == .authorizedWhenInUse ||
+              authorizationStatus == .authorizedAlways else {
             return
         }
-        
+
         manager.startUpdatingLocation()
     }
 }
 
 extension LocationManager: CLLocationManagerDelegate {
-    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+    nonisolated func locationManagerDidChangeAuthorization(
+        _ manager: CLLocationManager
+    ) {
         Task { @MainActor [weak self] in
-            guard let self else {return }
-            
-            authorizatioStatus = manager.authorizationStatus
-            startUpdatingIfAllowed()
+            guard let self else { return }
+
+            authorizationStatus = manager.authorizationStatus
+            startUpdatingLocationIfAllowed()
         }
     }
-    
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocatios locations: [CLLocation]
+
+    nonisolated func locationManager(
+        _ manager: CLLocationManager,
+        didUpdateLocations locations: [CLLocation]
+
     ) {
         Task { @MainActor [weak self] in
             self?.currentLocation = locations.last
