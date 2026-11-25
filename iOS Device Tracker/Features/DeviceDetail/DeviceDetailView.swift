@@ -10,9 +10,24 @@ import SwiftUI
 
 struct DeviceDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @Query private var observations: [DeviceObservation]
 
     let device: TrackedDevice
 
+    init(device: TrackedDevice) {
+        self.device = device
+        
+        let deviceID = device.id
+        
+        _observations = Query(
+            filter: #Predicate<DeviceObservation> { observation in
+                observation.deviceID == deviceID
+            },
+            sort: \DeviceObservation.timestamp,
+            order: .reverse
+        )
+    }
+    
     var body: some View {
         List {
             Section("Device") {
@@ -52,6 +67,34 @@ struct DeviceDetailView: View {
                     Text("\(device.latestRSSI) dBm")
                 }
             }
+            
+            Section("Observed Locations") {
+                if observations.isEmpty {
+                    Text("No location observations recorded yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(observations) { observation in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(
+                                "\(observation.latitude), \(observation.longitude)"
+                            )
+                            .font(.subheadline)
+                            
+                            Text(
+                                observation.timestamp,
+                                format: .dateTime
+                                    .month()
+                                    .day()
+                                    .year()
+                                    .hour()
+                                    .minute()
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle(device.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -78,5 +121,5 @@ struct DeviceDetailView: View {
             )
         )
     }
-    .modelContainer(for: TrackedDevice.self, inMemory: true)
+    .modelContainer(for: [TrackedDevice.self, DeviceObservation.self], inMemory: true)
 }

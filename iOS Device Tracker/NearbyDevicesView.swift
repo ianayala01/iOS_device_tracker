@@ -12,6 +12,7 @@ import CoreBluetooth
 struct NearbyDevicesView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var bluetoothManager = BluetoothManager()
+    @StateObject private var locationManager = LocationManager()
 
     var body: some View {
         NavigationStack {
@@ -67,7 +68,9 @@ struct NearbyDevicesView: View {
                 }
             }
             .onAppear {
-                bluetoothManager.configure(with: modelContext)
+                locationManager.requestPermission()
+                
+                bluetoothManager.configure(with: modelContext, locationManager: locationManager)
             }
         }
     }

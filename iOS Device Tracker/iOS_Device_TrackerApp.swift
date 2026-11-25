@@ -13,6 +13,7 @@ struct iOS_Device_TrackerApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             TrackedDevice.self,
+            DeviceObservation.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

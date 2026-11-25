@@ -9,6 +9,7 @@ import CoreBluetooth
 import Combine
 import Foundation
 import SwiftData
+internal import _LocationEssentials
 
 /// Owns the Core Bluetooth scanner and publishes the devices found by it.
 @MainActor
@@ -20,6 +21,7 @@ final class BluetoothManager: NSObject, ObservableObject {
     private var centralManager: CBCentralManager!
     private var devicesByID: [UUID: TrackedDevice] = [:]
     private var modelContext: ModelContext?
+    private var locationManager: LocationManager?
 
     override init() {
         super.init()
@@ -30,9 +32,12 @@ final class BluetoothManager: NSObject, ObservableObject {
         )
     }
 
-    func configure(with modelContext: ModelContext) {
+    func configure(
+        with modelContext: ModelContext,
+        locationManager: LocationManager
+    ) {
         self.modelContext = modelContext
-
+        self.locationManager = locationManager
     }
 
     func startScanning() {
@@ -60,6 +65,25 @@ final class BluetoothManager: NSObject, ObservableObject {
         saveChanges()
     }
 
+    private func recordObservation(
+        for device: TrackedDevice,
+        rssi: Int
+    ) {
+        guard let modelContext,
+              let location = locationManager?.currentLocation else {
+            return
+        }
+        
+        let observation = DeviceObservation(
+            deviceID: device.id,
+            latitude: location.coordinate.latitude,
+            longitude: location.coordinate.longitude,
+            rssi: rssi
+        )
+        
+        modelContext.insert(observation)
+    }
+    
     private func updateDevice(
         peripheral: CBPeripheral,
         advertisementData: [String: Any],
@@ -102,6 +126,8 @@ final class BluetoothManager: NSObject, ObservableObject {
 
         if isFirstDiscoveryThisScan {
             device.sightingCount += 1
+            
+            recordObservation(for: device, rssi: signalStrength)
         }
 
         nearbyDevices = devicesByID.values.sorted {
