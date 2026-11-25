@@ -32,6 +32,7 @@ final class BluetoothManager: NSObject, ObservableObject {
 
     func configure(with modelContext: ModelContext) {
         self.modelContext = modelContext
+
     }
 
     func startScanning() {
@@ -70,24 +71,28 @@ final class BluetoothManager: NSObject, ObservableObject {
         let signalStrength = rssi.intValue
 
         let device: TrackedDevice
-        var isNewDevice = false
+        var isFirstDiscoveryThisScan = false
 
         if let liveDevice = devicesByID[deviceID] {
             device = liveDevice
         } else if let savedDevice = savedDevice(withID: deviceID) {
             device = savedDevice
             devicesByID[deviceID] = savedDevice
+            isFirstDiscoveryThisScan = true
         } else {
             let newDevice = TrackedDevice(
                 id: deviceID,
                 name: deviceName,
+                firstSeen: .now,
+                lastSeen: .now,
+                sightingCount: 0,
                 latestRSSI: signalStrength
             )
 
             modelContext?.insert(newDevice)
             devicesByID[deviceID] = newDevice
             device = newDevice
-            isNewDevice = true
+            isFirstDiscoveryThisScan = true
         }
 
         // Update the live information without changing the saved trust choice.
@@ -95,13 +100,17 @@ final class BluetoothManager: NSObject, ObservableObject {
         device.lastSeen = .now
         device.latestRSSI = signalStrength
 
+        if isFirstDiscoveryThisScan {
+            device.sightingCount += 1
+        }
+
         nearbyDevices = devicesByID.values.sorted {
             $0.latestRSSI > $1.latestRSSI
         }
 
         // Save newly discovered devices immediately. RSSI and last-seen changes
         // are saved when scanning stops to avoid writing for every advertisement.
-        if isNewDevice {
+        if isFirstDiscoveryThisScan && device.sightingCount == 1 {
             saveChanges()
         }
     }

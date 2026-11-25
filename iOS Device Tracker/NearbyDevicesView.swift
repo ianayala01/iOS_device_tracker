@@ -41,6 +41,15 @@ struct NearbyDevicesView: View {
             }
             .navigationTitle("Nearby Devices")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        HistoryView()
+                    } label: {
+                        Label("History", systemImage: "clock.arrow.circlepath")
+
+                    }
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         if bluetoothManager.isScanning {
@@ -59,7 +68,6 @@ struct NearbyDevicesView: View {
             }
             .onAppear {
                 bluetoothManager.configure(with: modelContext)
-
             }
         }
     }
