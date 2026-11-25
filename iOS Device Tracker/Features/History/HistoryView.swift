@@ -22,7 +22,11 @@ struct HistoryView: View {
                 )
             } else {
                 List(trackedDevices) { device in
-                    HistoryDeviceRow(device: device)
+                    NavigationLink {
+                        DeviceDetailView(device: device)
+                    } label: {
+                        HistoryDeviceRow(device: device)
+                    }
                 }
             }
         }
@@ -35,8 +39,12 @@ private struct HistoryDeviceRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: device.isTrusted ? "checkmark.shield.fill" : "dot.radiowaves.left.and.right")
-                .foregroundStyle(device.isTrusted ? .green : .blue)
+            Image(
+                systemName: device.isTrusted
+                    ? "checkmark.shield.fill"
+                    : "dot.radiowaves.left.and.right"
+            )
+            .foregroundStyle(device.isTrusted ? .green : .blue)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(device.name)
@@ -46,9 +54,11 @@ private struct HistoryDeviceRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Text("Last seen \(device.lastSeen, format: .relative(presentation: .named))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "Last seen \(device.lastSeen, format: .relative(presentation: .named))"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
